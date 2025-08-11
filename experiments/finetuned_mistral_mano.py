@@ -21,13 +21,6 @@ from transformers import (
 from peft import LoraConfig, get_peft_model
 
 
-SYSTEM_PROMPT = (
-    "You are a contract clause classifier. "
-    "Classify the user's clause into one of the known categories. "
-    "Respond with only the category name."
-)
-
-
 def extract_label_name(ex: Dict) -> str:
     # adapte si ta clé diffère
     labels = ex.get("labels", {})
