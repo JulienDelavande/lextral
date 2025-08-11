@@ -6,14 +6,15 @@ Try it out online at [https://lextral.delavande.fr](https://lextral.delavande.fr
 
 We explored three main strategies for contract clause classification:
 
-1. **Prompt-based classification** – Use a general-purpose LLM (e.g., *mistral-small*) with a simple zero-shot prompt listing all possible categories. The model directly returns the predicted category name.
-2. **Retrieval-augmented classification** – Embed all training clauses (60k) using *Mistral Embed*, store them in a `pgvector` database with an HNSW index, and at inference time embed the query clause, retrieve the *k* most similar clauses and their labels, then include them as few-shot examples in the prompt.
-3. **Fine-tuned classification** – Fine-tune a larger model (*Ministral 3B*) with a classification head on the 60k training clauses using LoRA, enabling the model to directly predict the correct label without additional context retrieval.
+1. **Prompt-based classification** - Use a general-purpose LLM (e.g., *mistral-small*) with a simple zero-shot prompt listing all possible categories. The model directly returns the predicted category name.
+2. **Retrieval-augmented classification** - Embed all training clauses (60k) using *Mistral Embed*, store them in a `pgvector` database with an HNSW index, and at inference time embed the query clause, retrieve the *k* most similar clauses and their labels, then include them as few-shot examples in the prompt.
+3. **Fine-tuned classification** - Fine-tune a larger model (*Ministral 3B*) with a classification head on the 60k training clauses using LoRA, enabling the model to directly predict the correct label without additional context retrieval.
 
 The project is organized into two main components:
 
-* **Experiments** – for running experiments and fine-tuning the model.
-* **Backend** – for the deployed version of the solution, available online at [https://lextral.delavande.fr](https://lextral.delavande.fr) and the api documentation at [https://lextral.delavande.fr/docs](https://lextral.delavande.fr/docs).
+* **Experiments** - for running experiments and fine-tuning the model.
+* **Backend** - for the deployed version of the solution, available online at [https://lextral.delavande.fr](https://lextral.delavande.fr) and the api documentation at [https://lextral.delavande.fr/docs](https://lextral.delavande.fr/docs).
+* **Lextral.pdf** - Technical presentation
 
 ---
 
@@ -62,7 +63,7 @@ The generated files will be stored in the `data/jsonl` directory.
 
 ## Fine-tuning the Mistral Model
 
-### Step 1 – Upload the datasets
+### Step 1 - Upload the datasets
 
 Upload the datasets to Mistral Cloud:
 
@@ -70,7 +71,7 @@ Upload the datasets to Mistral Cloud:
 make upload
 ```
 
-### Step 2 – Create a fine-tuning job
+### Step 2 - Create a fine-tuning job
 
 Create a fine-tuning job:
 
@@ -78,7 +79,7 @@ Create a fine-tuning job:
 make create-finetune-job
 ```
 
-### Step 3 – Start the fine-tuning
+### Step 3 - Start the fine-tuning
 
 Start the fine-tuning job:
 
@@ -86,7 +87,7 @@ Start the fine-tuning job:
 make start-finetune
 ```
 
-### Step 4 – Check the job status
+### Step 4 - Check the job status
 
 Monitor the fine-tuning progress:
 
@@ -140,7 +141,7 @@ Evaluation results will be saved in the `data/evaluations` directory.
 
 For evaluation of the RAG (Retrieval-Augmented Generation) model, a local PostgreSQL database with pgvector is required. Follow these steps to provision the database:
 
-### Step 1 – Start the PostgreSQL database
+### Step 1 - Start the PostgreSQL database
 
 Run the initialization script to set up the database:
 
@@ -148,7 +149,7 @@ Run the initialization script to set up the database:
 bash db/init.sh
 ```
 
-### Step 2 – Apply database migrations
+### Step 2 - Apply database migrations
 
 Apply the necessary migrations to create the required tables:
 
@@ -156,7 +157,7 @@ Apply the necessary migrations to create the required tables:
 bash db/apply_migrations.py
 ```
 
-### Step 3 – Build embeddings
+### Step 3 - Build embeddings
 
 Generate and store embeddings in the database:
 
