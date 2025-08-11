@@ -14,6 +14,18 @@ URL_PREDICT_RAG = os.getenv("URL_PREDICT_RAG", "https://lextral.delavande.fr/pre
 client = Mistral(api_key=MISTRAL_API_KEY)
 
 def predict_label(texts, model_name=BASE_MODEL, model_strategy="prompt"):
+    """
+    Predict labels for a list of texts using the specified model and strategy.
+
+    Args:
+        texts (list): List of text inputs to classify.
+        model_name (str): Name of the model to use for predictions.
+        model_strategy (str): Strategy to use for predictions ('chatprompt', 'classifier', 'rag+model', 'rag').
+
+    Returns:
+        list: Predicted labels.
+    """
+    print(f"Predicting labels with model: {model_name}, strategy: {model_strategy}")
     if model_strategy == "classifier":
         resp = client.classifiers.classify(
             model=model_name,
@@ -94,6 +106,17 @@ def predict_label(texts, model_name=BASE_MODEL, model_strategy="prompt"):
 
 
 async def predict_label_async(text, model_name=BASE_MODEL):
+    """    
+    Predict a label for a single text input asynchronously.
+
+    Args:
+        text (str): Text input to classify.
+        model_name (str): Name of the model to use for predictions.
+
+    Returns:
+        str: Predicted label.
+    """
+    print(f"Predicting label asynchronously with model: {model_name}")
     prompt = format_prompt(text)
     messages = [UserMessage(content=prompt)]
     response = await client.chat.complete_async(

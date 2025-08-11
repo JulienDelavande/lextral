@@ -1,5 +1,4 @@
 import datetime
-import json
 import os
 import argparse
 from mistralai import Mistral
@@ -12,12 +11,36 @@ api_key = os.environ["MISTRAL_API_KEY"]
 client = Mistral(api_key=api_key)
 
 def upload_file(path):
+    """
+    Upload a file to Mistral and return the file object.
+    
+    Args:
+        path (str): Path to the file to upload.
+    
+    Returns:
+        File: The uploaded file object.
+    """
     with open(path, "rb") as f:
         file = client.files.upload(file={"file_name": os.path.basename(path), "content": f})
     print(f"Uploaded {path} : ID = {file.id}")
     return file
 
 def create_job(train_id, val_id, base_model, steps=100, lr=0.0001, wandb=True):
+    """
+    Create a fine-tuning job with the specified parameters.
+    
+    Args:
+        train_id (str): ID of the training file.
+        val_id (str): ID of the validation file.
+        base_model (str): Name of the base model to fine-tune.
+        steps (int): Number of training steps. Default is 100.
+        lr (float): Learning rate for training. Default is 0.0001.
+        wandb (bool): Whether to integrate with Weights & Biases. Default is True.
+    
+    Returns:
+        Job: The created fine-tuning job object.
+    """
+    print(f"Creating job with base model: {base_model}, steps: {steps}, learning rate: {lr}")
     integrations = []
     if wandb and WANDB_KEY:
         integrations.append({
@@ -41,12 +64,25 @@ def create_job(train_id, val_id, base_model, steps=100, lr=0.0001, wandb=True):
     return job
 
 def start_job(job_id):
+    """
+    Start a fine-tuning job by its ID.
+    
+    Args:
+        job_id (str): ID of the job to start.
+    """
     print(f"Starting job {job_id}...")
     job = client.fine_tuning.jobs.start(job_id=job_id)
     print(f"Job {job_id} started.")
     print(f"Job details:\n{job}")
 
 def get_status(job_id):
+    """
+    Get the status of a fine-tuning job by its ID.
+    
+    Args:
+        job_id (str): ID of the job to check status for.
+    """
+    print(f"Fetching status for job {job_id}...")
     job = client.fine_tuning.jobs.get(job_id=job_id)
     estimated_start_ts = job.metadata.estimated_start_time
     print(f"Status for job {job.id}:\n"
@@ -100,7 +136,7 @@ if __name__ == "__main__":
     if args.command == "upload":
         train = upload_file(args.train_file)
         val = upload_file(args.val_file)
-        print(f"🏷️ Train ID: {train.id}\n🏷️ Val ID: {val.id}")
+        print(f"Train ID: {train.id}\n Val ID: {val.id}")
     elif args.command == "create":
         job = create_job(args.train_id, args.val_id, args.base_model, args.steps, args.lr)
         print(f"Job created with ID: {job.id}")

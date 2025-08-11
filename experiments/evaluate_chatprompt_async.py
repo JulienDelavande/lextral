@@ -12,6 +12,16 @@ BATCH_SIZE = 1000
 JITTER = 1
 
 async def process_batch(batch, model_name):
+    """Process a batch of text asynchronously and return predictions.
+
+    Args:
+        batch (list): List of text inputs to process.
+        model_name (str): The name of the model to use for predictions.
+
+    Returns:
+        list: List of predicted labels.
+    """
+    print(f"Processing batch of size {len(batch)} with model {model_name}")
     tasks = [
         predict_label_async(example, model_name=model_name)
         for example in batch
@@ -20,6 +30,13 @@ async def process_batch(batch, model_name):
 
 
 async def evaluate_async(model_name, max_samples=None):
+    """Evaluate the model asynchronously on the LEDGAR dataset.
+
+    Args:
+        model_name (str): The name of the model to use for evaluation.
+        max_samples (int, optional): Maximum number of samples to evaluate. Defaults to None (all samples).
+    """
+    print(f"Evaluating model: {model_name} with max_samples={max_samples}")
     dataset = load_dataset("lex_glue", "ledgar", split="test")
     if max_samples:
         dataset = dataset.select(range(max_samples))

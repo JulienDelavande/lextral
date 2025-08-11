@@ -22,7 +22,8 @@ The project is organized into two main components:
 To install all required dependencies, run:
 
 ```bash
-make install
+cd backend
+uv sync
 source backend/venv/bin/activate
 ```
 
@@ -92,6 +93,20 @@ Monitor the fine-tuning progress:
 ```bash
 make status
 ```
+
+## Self tuned you model
+
+```bash
+# For the Head only
+python experiments/finetune_mistral_self.py --base_model mistralai/Ministral-8B-Instruct-2410 --output_dir ./outputs_ministral8b_head
+
+# For the Head + LoRA
+python experiments/finetune_mistral_self.py --base_model mistralai/Ministral-8B-Instruct-2410 --output_dir ./outputs_ministral8b_headlora --lora
+
+# For evaluation
+python experiments/evaluate_mistral_self.py --ckpt_dir ./outputs_ministral8b_head
+```
+
 
 ---
 

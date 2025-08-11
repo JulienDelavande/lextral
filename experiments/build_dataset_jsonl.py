@@ -5,6 +5,13 @@ import argparse
 OUTPUT_FOLDER='./data/jsonl'
 
 def convert_ledgar_split(split: str, output_folder: str, max_items: int = -1):
+    """
+    Convert a specific split of the LEDGAR dataset to JSONL format.
+    Args:
+        split (str): The dataset split to convert (train, validation, or test).
+        output_folder (str): The folder where the JSONL file will be saved.
+        max_items (int): Maximum number of items to include in the output. Default is -1 (all items).
+"""
     ds = load_dataset("lex_glue", "ledgar", split=split)
     
     label_names = ds.features["label"].names
