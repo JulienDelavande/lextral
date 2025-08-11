@@ -1,0 +1,16 @@
+apiVersion: v2
+name: lextral
+version: 0.1.0
+description: A Helm chart for deploying lextral
+
+type: application
+
+# This is the Helm chart API version. It is version 2 for Helm 3.
+# For Helm 2, use apiVersion: v1.
+
+dependencies:
+  - name: postgresql
+    version: 16.7.21
+    repository: https://charts.bitnami.com/bitnami
+    condition: postgresql.enabled
+

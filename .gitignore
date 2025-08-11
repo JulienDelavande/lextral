@@ -1,3 +1,6 @@
 .venv/
 secrets.env
 *.jsonl
+__pycache__/
+data/
+kubernetes/values.yaml

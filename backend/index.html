@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Clause Classifier — UI</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<style>
+  :root{
+    --bg:#ffffff; --text:#111111; --muted:#666666;
+    --card:#f9f9f9; --border:#e5e5e5; --input:#ffffff;
+    --accent:#0a66c2; --ok:#1f9d55; --err:#c62828;
+  }
+  *,*::before,*::after{ box-sizing:border-box; }
+  html,body{
+    height:100%; margin:0; background:var(--bg); color:var(--text);
+    font:14px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+  }
+  .wrap{ max-width:960px; margin:40px auto; padding:0 16px; }
+  .card{ background:var(--card); border:1px solid var(--border); border-radius:12px; padding:18px; overflow:hidden; }
+  h1{ font-size:18px; margin:0 0 12px; }
+  label{ display:block; font-size:12px; color:var(--muted); margin:0 0 6px; }
+  input,select,textarea{
+    width:100%; background:var(--input); color:var(--text);
+    border:1px solid var(--border); border-radius:8px; padding:10px 12px; outline:none;
+  }
+  textarea{ min-height:130px; resize:vertical; }
+  .hint{ font-size:12px; color:var(--muted); margin-top:6px; }
+
+  /* Layout utilities */
+  .row{
+    display:grid;
+    grid-template-columns: minmax(0,1fr) minmax(280px,420px);
+    gap:12px; align-items:start;
+  }
+  .col-stack{ display:grid; gap:12px; }
+  .row-3{
+    display:grid;
+    grid-template-columns: repeat(3, minmax(0,1fr));
+    gap:12px;
+  }
+  /* Prevent children from forcing overflow */
+  .row > *, .col-stack > * { min-width:0; }
+
+  /* Actions / status */
+  .toolbar{ display:flex; gap:10px; align-items:center; justify-content:flex-end; }
+  .pill{ padding:4px 10px; border-radius:999px; border:1px solid var(--border); color:var(--muted); font-size:12px; }
+  .ok{ color:var(--ok); }
+  .err{ color:var(--err); }
+  .btn{ border:1px solid var(--accent); background:var(--accent); color:#fff; padding:9px 14px; border-radius:8px; font-weight:600; cursor:pointer; }
+  .btn:disabled{ opacity:.6; cursor:not-allowed; }
+  .btn:hover{ opacity:.9; }
+
+  /* Results */
+  .result{ background:var(--input); border:1px solid var(--border); border-radius:8px; padding:10px; white-space:pre-wrap; }
+  details summary{ cursor:pointer; }
+
+  /* Table */
+  table{ width:100%; border-collapse:collapse; font-size:13px; }
+  th,td{ padding:8px 6px; border-bottom:1px solid var(--border); text-align:left; }
+  th{ color:var(--muted); }
+
+  /* Responsive */
+  @media (max-width: 900px){
+    .row{ grid-template-columns: 1fr; }
+    .row-3{ grid-template-columns: repeat(2, minmax(0,1fr)); }
+  }
+  @media (max-width: 600px){
+    .row-3{ grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <!-- Playground -->
+    <div class="card" style="margin-bottom:16px;">
+      <h1>Clause Classifier — Playground</h1>
+
+      <div class="row">
+        <!-- Left column -->
+        <div>
+          <label for="texts">Texts (one per line)</label>
+          <textarea id="texts" placeholder="Paste one clause per line..."></textarea>
+          <div class="hint">Each non-empty line is sent as a separate example.</div>
+        </div>
+
+        <!-- Right column (stack) -->
+        <div class="col-stack">
+          <div>
+            <label for="mode">Mode</label>
+            <select id="mode">
+              <option value="base">Base model</option>
+              <option value="finetuned">Fine-tuned</option>
+              <option value="rag">RAG</option>
+            </select>
+          </div>
+
+          <div class="row-3" id="ragBlock">
+            <div>
+              <label for="top_k">top_k (RAG)</label>
+              <input id="top_k" type="number" min="1" value="5" />
+            </div>
+            <div>
+              <label for="min_sim">min_sim (RAG)</label>
+              <input id="min_sim" type="number" step="0.01" value="0.0" />
+            </div>
+          </div>
+
+          <div class="toolbar">
+            <span class="pill" id="status">Ready</span>
+            <button class="btn" id="runBtn">Classify</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Results -->
+    <div class="card" style="margin-bottom:16px;">
+      <h1>Results</h1>
+      <div id="out" class="result">No results yet.</div>
+      <details style="margin-top:10px;">
+        <summary>Raw Prompts (debug)</summary>
+        <div id="prompts" class="result" style="margin-top:8px;"></div>
+      </details>
+    </div>
+
+    <!-- How it works -->
+    <div class="card">
+      <h1>How this works</h1>
+      <table>
+        <tr><th>Mode</th><th>Endpoint</th><th>Body</th></tr>
+        <tr><td>Base</td><td><code>POST /predict_base</code></td><td><code>{"texts":["..."]}</code></td></tr>
+        <tr><td>Fine-tuned</td><td><code>POST /predict_finetuned</code></td><td><code>{"texts":["..."]}</code></td></tr>
+        <tr><td>RAG</td><td><code>POST /predict_rag</code></td><td><code>{"texts":["..."],"top_k":5,"min_sim":0,"system_prompt":"..."}</code></td></tr>
+      </table>
+    </div>
+  </div>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+  const statusPill = $("status");
+  const out = $("out");
+  const promptsDiv = $("prompts");
+  const runBtn = $("runBtn");
+  const modeSel = $("mode");
+  const ragBlock = $("ragBlock");
+
+  function setStatus(text, ok=true){
+    statusPill.textContent = text;
+    statusPill.className = "pill " + (ok ? "ok" : "err");
+  }
+
+  function toggleRagBlock(){
+    ragBlock.style.display = modeSel.value === "rag" ? "grid" : "none";
+  }
+  toggleRagBlock();
+  modeSel.addEventListener("change", toggleRagBlock);
+
+  async function classify(){
+    const mode = modeSel.value;
+    const lines = $("texts").value.split("\n").map(s=>s.trim()).filter(Boolean);
+    if (!lines.length){
+      setStatus("No input", false);
+      out.textContent = "Please provide at least one line.";
+      return;
+    }
+
+    let url = "", body = {};
+    if (mode === "base"){
+      url = "/predict_base";
+      body = { texts: lines };
+    } else if (mode === "finetuned"){
+      url = "/predict_finetuned";
+      body = { texts: lines };
+    } else {
+      url = "/predict_rag";
+      const top_k = parseInt($("top_k").value || "5", 10);
+      const min_sim = parseFloat($("min_sim").value || "0");
+      const spEl = $("system_prompt");
+      const system_prompt = (spEl && spEl.value?.trim()) || "You are a legal clause classifier. Return only the class name.";
+      body = { texts: lines, top_k, min_sim, system_prompt };
+    }
+
+    runBtn.disabled = true;
+    setStatus("Running…", true);
+    out.textContent = "Request sent…";
+    promptsDiv.textContent = "";
+
+    try{
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Accept": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok){
+        let err = "";
+        try { err = (await res.json()).detail || res.statusText; } catch { err = res.statusText; }
+        throw new Error(err);
+      }
+      const data = await res.json();
+      const preds = data.predicted_classes || [];
+      out.textContent = preds.length
+        ? preds.map((p,i)=>`• [${i+1}] ${p}`).join("\n")
+        : "(no predictions)";
+
+      const prompts = data.prompts || [];
+      promptsDiv.textContent = prompts.length
+        ? prompts.map((pr,i)=>`--- Prompt ${i+1} ---\n${pr}`).join("\n\n")
+        : "(no prompts returned)";
+
+      setStatus("Done", true);
+    } catch(e){
+      out.textContent = "Error: " + (e?.message || String(e));
+      setStatus("Error", false);
+    } finally{
+      runBtn.disabled = false;
+    }
+  }
+
+  runBtn.addEventListener("click", classify);
+</script>
+</body>
+</html>

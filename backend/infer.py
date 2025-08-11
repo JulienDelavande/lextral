@@ -1,18 +1,16 @@
 import os
-import requests
 import json
 from mistralai import Mistral
 from mistralai.models import UserMessage
-from mistral_utils import format_prompt, parse_response
+from mistral_utils import format_prompt, parse_response_name
 
 MISTRAL_API_KEY = os.getenv("MISTRAL_API_KEY")
 FINE_TUNED_MODEL = os.getenv("FINE_TUNED_MODEL") or "mistral-small"
 BASE_MODEL = os.getenv("BASE_MODEL", "mistral-small")
-URL_PREDICT_RAG = os.getenv("URL_PREDICT_RAG", "https://lextral.delavande.fr/predict_rag")
 
 client = Mistral(api_key=MISTRAL_API_KEY)
 
-def predict_label(texts, model_name=BASE_MODEL, model_strategy="prompt"):
+def predict_label(texts, model_name=BASE_MODEL, model_strategy="chatprompt"):
     if model_strategy == "classifier":
         resp = client.classifiers.classify(
             model=model_name,
@@ -40,9 +38,9 @@ def predict_label(texts, model_name=BASE_MODEL, model_strategy="prompt"):
                 raise ValueError(f"'scores' is empty or invalid in the result: {item}")
 
             best_label_name = max(scores.items(), key=lambda kv: kv[1])[0]
-            preds.append(parse_response(best_label_name))
+            preds.append(parse_response_name(best_label_name))
+        return preds, texts
 
-        return preds
     elif model_strategy == "chatprompt":
         prompts = [format_prompt(text) for text in texts]
         messages = [UserMessage(content=prompt) for prompt in prompts]
@@ -51,21 +49,7 @@ def predict_label(texts, model_name=BASE_MODEL, model_strategy="prompt"):
             messages=[message],
             temperature=0,
             ) for message in messages]
-        return [parse_response(response.choices[0].message.content) for response in responses]
-    elif model_strategy == "rag":
-        url = URL_PREDICT_RAG
-        headers = {
-            "accept": "application/json",
-            "Content-Type": "application/json"
-        }
-        data = {
-            "texts": texts,
-            "top_k": 5,
-            "min_sim": 0
-        }
-
-        response = requests.post(url, headers=headers, json=data)
-        return [parse_response(predicted_label) for predicted_label in response.json().get("predicted_classes", [])]
+        return [parse_response_name(response.choices[0].message.content) for response in responses], messages
     else:
         raise ValueError(f"Unknown strategy: {model_strategy}")
 
@@ -79,4 +63,13 @@ async def predict_label_async(text, model_name=BASE_MODEL):
         temperature=0,
     )
 
-    return parse_response(response.choices[0].message.content)
+    return parse_response_name(response.choices[0].message.content), messages
+
+def chat_complete(messages):
+    resp = client.chat.complete(
+                model=BASE_MODEL,
+                messages=messages,
+                temperature=0,
+            )
+    pred = parse_response_name(resp.choices[0].message.content)
+    return pred
