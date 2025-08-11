@@ -38,10 +38,13 @@
     grid-template-columns: repeat(3, minmax(0,1fr));
     gap:12px;
   }
-  /* Prevent children from forcing overflow */
+  .row-2{
+    display:grid;
+    grid-template-columns: repeat(2, minmax(0,1fr));
+    gap:12px;
+  }
   .row > *, .col-stack > * { min-width:0; }
 
-  /* Actions / status */
   .toolbar{ display:flex; gap:10px; align-items:center; justify-content:flex-end; }
   .pill{ padding:4px 10px; border-radius:999px; border:1px solid var(--border); color:var(--muted); font-size:12px; }
   .ok{ color:var(--ok); }
@@ -50,19 +53,17 @@
   .btn:disabled{ opacity:.6; cursor:not-allowed; }
   .btn:hover{ opacity:.9; }
 
-  /* Results */
   .result{ background:var(--input); border:1px solid var(--border); border-radius:8px; padding:10px; white-space:pre-wrap; }
   details summary{ cursor:pointer; }
 
-  /* Table */
   table{ width:100%; border-collapse:collapse; font-size:13px; }
   th,td{ padding:8px 6px; border-bottom:1px solid var(--border); text-align:left; }
   th{ color:var(--muted); }
 
-  /* Responsive */
   @media (max-width: 900px){
     .row{ grid-template-columns: 1fr; }
     .row-3{ grid-template-columns: repeat(2, minmax(0,1fr)); }
+    .row-2{ grid-template-columns: 1fr; }
   }
   @media (max-width: 600px){
     .row-3{ grid-template-columns: 1fr; }
@@ -90,10 +91,12 @@
             <select id="mode">
               <option value="base">Base model</option>
               <option value="finetuned">Fine-tuned</option>
-              <option value="rag">RAG</option>
+              <option value="rag">RAG (Chat)</option>
+              <option value="rag_knn">RAG (kNN)</option>
             </select>
           </div>
 
+          <!-- RAG (Chat) block -->
           <div class="row-3" id="ragBlock">
             <div>
               <label for="top_k">top_k (RAG)</label>
@@ -102,6 +105,42 @@
             <div>
               <label for="min_sim">min_sim (RAG)</label>
               <input id="min_sim" type="number" step="0.01" value="0.0" />
+            </div>
+          </div>
+
+          <!-- RAG (kNN) block -->
+          <div class="col-stack" id="ragKnnBlock">
+            <div class="row-3">
+              <div>
+                <label for="knn_top_k">top_k</label>
+                <input id="knn_top_k" type="number" min="1" value="10" />
+              </div>
+              <div>
+                <label for="knn_min_sim">min_sim</label>
+                <input id="knn_min_sim" type="number" step="0.01" value="0.0" />
+              </div>
+              <div>
+                <label for="knn_strategy">strategy</label>
+                <select id="knn_strategy">
+                  <option value="softmax" selected>softmax</option>
+                  <option value="weighted">weighted</option>
+                  <option value="majority">majority</option>
+                </select>
+              </div>
+            </div>
+            <div class="row-2">
+              <div>
+                <label for="knn_tau">tau (softmax)</label>
+                <input id="knn_tau" type="number" step="0.01" min="0.01" value="0.10" />
+              </div>
+              <div>
+                <label for="knn_power">power (weighted)</label>
+                <input id="knn_power" type="number" step="0.1" min="0" value="2.0" />
+              </div>
+            </div>
+            <div>
+              <label for="knn_abstain">abstain_min_conf</label>
+              <input id="knn_abstain" type="number" step="0.01" min="0" max="1" value="0.35" />
             </div>
           </div>
 
@@ -118,7 +157,7 @@
       <h1>Results</h1>
       <div id="out" class="result">No results yet.</div>
       <details style="margin-top:10px;">
-        <summary>Raw Prompts (debug)</summary>
+        <summary>Raw Evidence / Prompts (debug)</summary>
         <div id="prompts" class="result" style="margin-top:8px;"></div>
       </details>
     </div>
@@ -130,7 +169,8 @@
         <tr><th>Mode</th><th>Endpoint</th><th>Body</th></tr>
         <tr><td>Base</td><td><code>POST /predict_base</code></td><td><code>{"texts":["..."]}</code></td></tr>
         <tr><td>Fine-tuned</td><td><code>POST /predict_finetuned</code></td><td><code>{"texts":["..."]}</code></td></tr>
-        <tr><td>RAG</td><td><code>POST /predict_rag</code></td><td><code>{"texts":["..."],"top_k":5,"min_sim":0,"system_prompt":"..."}</code></td></tr>
+        <tr><td>RAG (Chat)</td><td><code>POST /predict_rag</code></td><td><code>{"texts":["..."],"top_k":5,"min_sim":0,"system_prompt":"..."}</code></td></tr>
+        <tr><td>RAG (kNN)</td><td><code>POST /predict_rag_knn</code></td><td><code>{"texts":["..."],"top_k":10,"min_sim":0,"strategy":"softmax","tau":0.10,"power":2.0,"abstain_min_conf":0.35}</code></td></tr>
       </table>
     </div>
   </div>
@@ -143,17 +183,20 @@
   const runBtn = $("runBtn");
   const modeSel = $("mode");
   const ragBlock = $("ragBlock");
+  const ragKnnBlock = $("ragKnnBlock");
 
   function setStatus(text, ok=true){
     statusPill.textContent = text;
     statusPill.className = "pill " + (ok ? "ok" : "err");
   }
 
-  function toggleRagBlock(){
-    ragBlock.style.display = modeSel.value === "rag" ? "grid" : "none";
+  function toggleBlocks(){
+    const mode = modeSel.value;
+    ragBlock.style.display = (mode === "rag") ? "grid" : "none";
+    ragKnnBlock.style.display = (mode === "rag_knn") ? "grid" : "none";
   }
-  toggleRagBlock();
-  modeSel.addEventListener("change", toggleRagBlock);
+  toggleBlocks();
+  modeSel.addEventListener("change", toggleBlocks);
 
   async function classify(){
     const mode = modeSel.value;
@@ -171,13 +214,22 @@
     } else if (mode === "finetuned"){
       url = "/predict_finetuned";
       body = { texts: lines };
-    } else {
+    } else if (mode === "rag"){
       url = "/predict_rag";
       const top_k = parseInt($("top_k").value || "5", 10);
       const min_sim = parseFloat($("min_sim").value || "0");
-      const spEl = $("system_prompt");
-      const system_prompt = (spEl && spEl.value?.trim()) || "You are a legal clause classifier. Return only the class name.";
+      const system_prompt = ($("system_prompt").value || "You are a legal clause classifier. Return only the class name.").trim();
       body = { texts: lines, top_k, min_sim, system_prompt };
+    } else {
+      // RAG (kNN)
+      url = "/predict_rag_knn";
+      const top_k = parseInt($("knn_top_k").value || "10", 10);
+      const min_sim = parseFloat($("knn_min_sim").value || "0");
+      const strategy = $("knn_strategy").value || "softmax";
+      const tau = parseFloat($("knn_tau").value || "0.10");
+      const power = parseFloat($("knn_power").value || "2.0");
+      const abstain_min_conf = parseFloat($("knn_abstain").value || "0.35");
+      body = { texts: lines, top_k, min_sim, strategy, tau, power, abstain_min_conf };
     }
 
     runBtn.disabled = true;
@@ -203,9 +255,10 @@
         : "(no predictions)";
 
       const prompts = data.prompts || [];
+      // For kNN route this contains evidence/debug strings
       promptsDiv.textContent = prompts.length
-        ? prompts.map((pr,i)=>`--- Prompt ${i+1} ---\n${pr}`).join("\n\n")
-        : "(no prompts returned)";
+        ? prompts.map((pr,i)=>`--- Item ${i+1} ---\n${pr}`).join("\n\n")
+        : "(no evidence/prompts returned)";
 
       setStatus("Done", true);
     } catch(e){

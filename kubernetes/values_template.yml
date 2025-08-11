@@ -1,0 +1,63 @@
+replicaCount: 2
+
+image:
+  repository: lextral
+  tag: latest
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8000
+
+ingress:
+  enabled: true
+  host: lextral.delavande.fr
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    traefik.ingress.kubernetes.io/router.tls: "true"
+    traefik.ingress.kubernetes.io/router.tls.certresolver: myresolver
+  path: /
+  pathType: Prefix
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 250m
+    memory: 256Mi
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+app:
+  env:
+    DB_TYPE: "postgresql"
+    DB_HOST: "{{ .Release.Name }}-postgresql"
+    DB_PORT: "5432"
+    DB_NAME: "lextral-db"
+    DB_TN_MIGRATION_HISTORY: "migration_history"
+  # secretEnv:
+  #   DB_USER: "<your_db_user>"
+  #   DB_PASSWORD: "<your_db_password>"
+  #   MISTRAL_API_KEY: "<your_mistral_api_key>"
+global:
+  security:
+    allowInsecureImages: true
+
+postgresql:
+  image:
+    registry: docker.io
+    repository: juliendelavande/postgresql-pgvector
+    tag: "17"
+  auth:
+    postgresPassword: "postgres"
+    username: "app"
+    password: "app_password"
+    database: "lextral-db"
+  primary:
+    extraEnvVars:
+      - name: POSTGRES_DB
+        value: "lextral-db"

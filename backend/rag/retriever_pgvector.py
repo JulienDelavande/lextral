@@ -1,4 +1,3 @@
-# backend/rag/retriever_pgvector.py
 import os
 from typing import List, Optional, Tuple
 import psycopg2
@@ -26,13 +25,8 @@ def search_similar(
     split: Optional[str] = "train",
     label_id: Optional[int] = None,
 ) -> List[Tuple[str, str, float]]:
-    """
-    Retourne: [(label_text, text, similarity), ...] trié par similarité décroissante.
-    Similarité = 1 - (embedding <=> query_vec)  avec opérateur cosinus de pgvector.
-    """
     vec_lit = _to_vector_literal(text_embedding)
 
-    # On calcule 'sim' une seule fois dans la CTE q, puis on filtre/ordonne dessus.
     sql = """
     WITH q AS (
       SELECT
@@ -63,7 +57,6 @@ def search_similar(
     sql += " ORDER BY sim DESC LIMIT %s"
     params.append(int(top_k))
 
-    # Exécution
     with psycopg2.connect(DB_URL) as conn:
         with conn.cursor() as cur:
             cur.execute(sql, params)

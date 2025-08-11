@@ -16,7 +16,7 @@ MAX_SAMPLES = 1000
 # Building and Deploying the app
 DOCKER_REPO=juliendelavande
 IMAGE_NAME=lextral
-TAG=0.5
+TAG=0.6
 NAMESPACE=lextral
 PG_IMAGE_REPO=$(DOCKER_REPO)/postgresql-pgvector
 PG_TAG=17

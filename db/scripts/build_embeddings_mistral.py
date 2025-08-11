@@ -28,8 +28,6 @@ if DB_PASSWORD:
 else:
     DB_URL = f"{DB_TYPE}://{DB_USER}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
 
-
-assert DB_URL, "DB_URL missing"
 assert MISTRAL_API_KEY, "MISTRAL_API_KEY missing"
 
 client = Mistral(api_key=MISTRAL_API_KEY)
@@ -39,9 +37,6 @@ def chunks(xs: List, n: int) -> Iterable[List]:
         yield xs[i : i + n]
 
 def embed_batch(texts: List[str]) -> List[List[float]]:
-    """
-    Appelle l'API embeddings en gérant les retries exponentiels.
-    """
     attempt = 0
     while True:
         try:
@@ -55,18 +50,12 @@ def embed_batch(texts: List[str]) -> List[List[float]]:
             time.sleep(sleep_s)
 
 def to_vector_literal(vec: List[float]) -> str:
-    """
-    Format compatible pgvector: '[v1, v2, ...]'.
-    On passera ce string avec un cast ::vector côté SQL.
-    """
     return "[" + ", ".join(f"{x:.8f}" for x in vec) + "]"
 
 def main():
-    # Charge LEDGAR (lex_glue)
     ds = load_dataset("lex_glue", "ledgar", split=SPLIT)
     label_names = ds.features["label"].names 
-    # first 100
-    ds = ds[30000:60000]
+    #ds = ds[30000:60000]
 
     print(f"Loaded {len(ds)} examples from split='{SPLIT}'")
 

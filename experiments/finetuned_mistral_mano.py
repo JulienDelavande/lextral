@@ -60,8 +60,6 @@ def load_jsonl_dataset(path: str, tokenizer, label_list: Optional[List[str]] = N
     ds = ds.map(map_fn, remove_columns=[c for c in ds.column_names if c not in cols])
     ds = ds.with_format("torch", columns=cols)
     return ds, label_list, label2id, id2label
-
-
 class MeanPoolerHead(nn.Module):
     def __init__(self, hidden_size: int, num_labels: int, dropout: float = 0.1):
         super().__init__()
@@ -69,12 +67,16 @@ class MeanPoolerHead(nn.Module):
         self.classifier = nn.Linear(hidden_size, num_labels)
 
     def forward(self, last_hidden_state, attention_mask):
-        # mean pooling masquée (B, T, H) -> (B, H)
-        mask = attention_mask.unsqueeze(-1)  # (B,T,1)
+        # ensure mask has same dtype as hidden states to avoid implicit casts
+        mask = attention_mask.unsqueeze(-1).to(dtype=last_hidden_state.dtype)  # (B,T,1)
         summed = (last_hidden_state * mask).sum(dim=1)
         denom = mask.sum(dim=1).clamp(min=1)
         pooled = summed / denom
         pooled = self.dropout(pooled)
+
+        # match input dtype to the classifier weights dtype (bf16/fp16/fp32)
+        pooled = pooled.to(self.classifier.weight.dtype)
+
         logits = self.classifier(pooled)
         return logits
 
@@ -84,24 +86,35 @@ class CausalLMWithClsHead(nn.Module):
         super().__init__()
         self.base = base_model
         hidden = base_model.config.hidden_size
-        self.head = MeanPoolerHead(hidden, num_labels, dropout)
+
+        # create head and immediately cast it to the base dtype
+        base_dtype = next(self.base.parameters()).dtype
+        self.head = MeanPoolerHead(hidden, num_labels, dropout).to(dtype=base_dtype)
 
     def forward(self, input_ids, attention_mask, labels=None):
-        # IMPORTANT: use_cache False en train
         outputs = self.base(
             input_ids=input_ids,
             attention_mask=attention_mask,
             use_cache=False,
-            output_hidden_states=False,
+            output_hidden_states=True,
+            return_dict=True,
         )
-        last_h = outputs.last_hidden_state  # (B,T,H)
+        last_h = outputs.hidden_states[-1]  # (B,T,H)
+
+        # keep head on the same device as last_h (useful with device_map="auto")
+        head_dev = next(self.head.parameters()).device
+        if head_dev != last_h.device:
+            self.head.to(last_h.device)
+
+        attention_mask = attention_mask.to(last_h.device)
         logits = self.head(last_h, attention_mask)
+
         out = {"logits": logits}
         if labels is not None:
-            loss = nn.CrossEntropyLoss()(logits, labels)
+            # compute loss in float32 for stability but keep grads flowing
+            loss = nn.CrossEntropyLoss()(logits.float(), labels.to(logits.device))
             out["loss"] = loss
         return out
-
 
 def train_one_epoch(model, dataloader, optimizer, scheduler, device, grad_accum=1, max_norm=1.0, log_every=50):
     model.train()

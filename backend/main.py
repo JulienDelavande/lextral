@@ -4,9 +4,10 @@ from fastapi.responses import FileResponse
 from infer import predict_label, chat_complete
 from rag.encoder_mistral import embed_texts
 from rag.retriever_pgvector import search_similar
-from mistral_utils import parse_response_name
-from models import ClauseRequest, PredictionResponse, RAGRequest
+from models import ClauseRequest, PredictionResponse, RAGRequest, RAGKNNRequest
 from mistral_utils import build_fewshot_prompt
+from rag.utils import _score_neighbors, _normalize, _format_evidence
+from typing import List
 
 app = FastAPI(title="Clause Classifier API")
 
@@ -69,3 +70,50 @@ def predict_clause_rag(req: RAGRequest):
         print(f"Error during RAG prediction: {e}")
         raise HTTPException(status_code=500, detail=str(e))
     
+@app.post("/predict_rag_knn", response_model=PredictionResponse)
+def predict_clause_rag_knn(req: RAGKNNRequest):
+    try:
+        if not req.texts:
+            raise HTTPException(status_code=400, detail="texts is empty")
+
+        query_vecs = embed_texts(req.texts)
+        preds: List[str] = []
+        evidences: List[str] = []
+        neighbors_all = []
+
+        for text, qv in zip(req.texts, query_vecs):
+            neighbors = search_similar(
+                qv,
+                top_k=req.top_k,
+                min_sim=req.min_sim,
+                split="train"
+            )
+            if not neighbors:
+                preds.append("__ABSTAIN__")
+                evidences.append("No neighbors found.")
+                continue
+
+            raw_scores = _score_neighbors(
+                neighbors,
+                strategy=req.strategy,
+                power=req.power,
+                tau=req.tau
+            )
+            probs = _normalize(raw_scores)
+            best_label, best_prob = max(probs.items(), key=lambda x: x[1]) if probs else ("__ABSTAIN__", 0.0)
+
+            if best_prob < req.abstain_min_conf:
+                best_label = "__ABSTAIN__"
+
+            preds.append(best_label)
+            evidences.append(_format_evidence(neighbors, probs))
+            neighbors_all.append(neighbors)
+
+        prompts = [f"Text: {text}\nEvidence:\n{evidence}\nNeighbors:\n{neighbors}" for text, evidence, neighbors in zip(req.texts, evidences, neighbors_all)]
+        return PredictionResponse(predicted_classes=preds, prompts=prompts)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error during kNN RAG prediction: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

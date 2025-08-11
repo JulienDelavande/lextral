@@ -21,8 +21,6 @@ def parse_response(response):
     Extract the label name and convert to ID.
     If ambiguous, fallback or return -1.
     """
-    print(f"Parsing response: \n<<<{response}>>>\n")
-    #print(f"Label map: {label_id_to_name}")
     for name in label_id_to_name.values():
         if name.lower() in response.lower():
             return label_name_to_id[name.lower()]
